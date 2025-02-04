@@ -24,18 +24,18 @@ Referensi : [ Predictive analysis of  taxi fare using  machine learning](https:/
 
 ### Problem Statements
 
--  **Pernyataan Masalah 1**: Bagaimana cara memprediksi harga perjalanan taksi dengan akurat berdasarkan berbagai fitur seperti jarak, waktu, kondisi cuaca, dan tarif per kilometer?
--  **Pernyataan Masalah 2**: Bagaimana cara mengurangi error dalam prediksi harga dengan berbagai algoritma machine learning?
+-  **Pernyataan Masalah 1**: Bagaimana memprediksi harga perjalanan taksi akurat berdasarkan berbagai fitur?
+-  **Pernyataan Masalah 2**: Bagaimana mengoptimalkan prediksi harga untuk meningkatkan transparansi penetapan tarif?
 
 ### Goals
 
--  **Jawaban Pernyataan Masalah 1**: Menggunakan model machine learning yang sesuai untuk memprediksi harga perjalanan taksi.
--  **Jawaban Pernyataan Masalah 2**: Mencapai model dengan error yang terkecil berdasarkan pengukuran Mean Squared Error (MSE).
+-  **Jawaban Pernyataan Masalah 1**: Mengembangkan model machine learning yang mampu memprediksi harga perjalanan taksi dengan akurasi tinggi.
+-  **Jawaban Pernyataan Masalah 2**: Mengurangi ketidakpastian dalam penetapan harga taksi melalui prediksi berbasis data
 
 ### Solution Statements
 
--   **Solution 1**: Menggunakan algoritma Random Forest yang memiliki keunggulan dalam menangani dataset yang lebih besar dan memberikan hasil yang lebih baik pada data yang lebih kompleks.
--   **Solution 2**: Melakukan perbaikan pada model melalui tuning hyperparameter untuk mengoptimalkan hasil prediksi.
+-   **Solution 1**: Menggunakan algoritma machine learning Random Forest untuk prediksi harga.
+-   **Solution 2**: Melakukan preprocessing data yang komprehensif untuk meningkatkan kualitas model
 
 ## Data Understanding
 
@@ -219,18 +219,65 @@ df=df[~((df_numerik<(Q1-1.5*IQR))|(df_numerik>(Q3+1.5*IQR))).any(axis=1)]
 df.shape
 ```
 
+### Feature Drop
+Fitur 'Passenger_Count' dan 'Base_Fare' memiliki korelasi yang sangat lemah, yaitu 0.03 dan 0.04. Sehingga, kedua fitur tersebut dapat di-drop
+
+```python
+df.drop(['Passenger_Count', 'Base_Fare'], inplace=True, axis=1)
+df.head()
+```
+
 ### Encoding Fitur Kategorikal
 Fitur kategorikal seperti 'Time_of_Day', 'Day_of_Week', 'Traffic_Conditions', dan 'Weather' diubah menjadi bentuk numerik menggunakan teknik one-hot encoding.
+
+```python
+from sklearn.preprocessing import  OneHotEncoder
+df = pd.concat([df, pd.get_dummies(df['Time_of_Day'], prefix='Time_of_Day')],axis=1)
+df = pd.concat([df, pd.get_dummies(df['Day_of_Week'], prefix='Day_of_Week')],axis=1)
+df = pd.concat([df, pd.get_dummies(df['Traffic_Conditions'], prefix='Traffic_Conditions')],axis=1)
+df = pd.concat([df, pd.get_dummies(df['Weather'], prefix='Weather')],axis=1)
+df.drop(['Time_of_Day','Day_of_Week','Traffic_Conditions', 'Weather'], axis=1, inplace=True)
+df.head()
+```
 
 ### Train-Test-Split
 Menggunakan proporsi pembagian sebesar 80:20 dengan fungsi train_test_split dari sklearn.
 
+```python
+from sklearn.model_selection import train_test_split
+
+X = df.drop(["Trip_Price"],axis =1)
+y = df["Trip_Price"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 123)
+```
+
 ### Standarisasi
 Data dinormalisasi dengan standar deviasi 1 dan rata-rata 0 menggunakan StandardScaler.
 
+```python
+from sklearn.preprocessing import StandardScaler
+
+numerical_features = ['Trip_Distance_km',	'Per_Km_Rate',	'Per_Minute_Rate',	'Trip_Duration_Minutes']
+scaler = StandardScaler()
+scaler.fit(X_train[numerical_features])
+X_train[numerical_features] = scaler.transform(X_train.loc[:, numerical_features])
+X_train[numerical_features].head()
+```
+
 ## Model Development
 
-Pada proyek ini, digunakan tiga algoritma machine learning untuk memprediksi harga perjalanan taksi: **K-Nearest Neighbor (KNN)**, **Random Forest**, dan **Boosting (AdaBoost)**. Berikut adalah kelebihan dan kekurangan dari masing-masing algoritma yang digunakan:
+Pada proyek ini, digunakan tiga algoritma machine learning untuk memprediksi harga perjalanan taksi: **K-Nearest Neighbor (KNN)**, **Random Forest**, dan **Boosting (AdaBoost)**. Berikut adalah penjelasan dan cara kerja dari masing-masing model :
+
+1.  **K-Nearest Neighbor (KNN)**
+KNN bekerja dengan prinsip "kemiripan" dalam ruang fitur. Algoritma ini memprediksi nilai target dengan mencari k tetangga terdekat berdasarkan jarak Euclidean. Parameter n_neighbors=10 berarti algoritma akan mempertimbangkan 10 data terdekat untuk menentukan prediksi. Semakin besar n_neighbors, prediksi akan semakin halus namun berisiko mengurangi detail spesifik. Ketika melakukan prediksi, KNN menghitung jarak antara titik baru dengan semua titik dalam dataset pelatihan, kemudian mengambil k tetangga terdekat. Prediksi akhir diperoleh melalui rata-rata nilai target dari k tetangga tersebut.
+
+2.  **Random Forest**
+Random Forest adalah algoritma ensemble yang membangun multiple decision tree secara acak. Parameter n_estimators=50 menentukan jumlah pohon keputusan yang akan dibuat, sementara max_depth=16 membatasi kedalaman setiap pohon untuk mencegah overfitting. Cara kerjanya dimulai dengan membuat subset data dan fitur secara acak untuk setiap pohon. Setiap pohon dilatih independen dengan subset tersebut. Saat prediksi, setiap pohon memberikan prediksi, kemudian hasil agregasi (rata-rata) dari semua pohon menjadi prediksi akhir. Metode ini memungkinkan model menangkap pola kompleks sambil meminimalkan overfitting.
+
+3.  **Boosting (AdaBoost)**
+AdaBoost membangun model sekuensial dengan fokus pada data yang sulit diprediksi. Parameter learning_rate=0.05 dengan random_state = 55 mengontrol kontribusi setiap model penguat. Algoritma ini bekerja dengan memberikan bobot pada setiap sampel data. Pada iterasi pertama, semua sampel memiliki bobot sama. Setelah model pertama dibuat, sampel yang salah diklasifikasi akan diberi bobot lebih tinggi. Model selanjutnya akan fokus memperbaiki kesalahan model sebelumnya. Prediksi akhir merupakan weighted sum dari prediksi model-model lemah, dengan bobot ditentukan oleh akurasi masing-masing model.
+
+Berikut adalah kelebihan dan kekurangan dari masing-masing algoritma yang digunakan:
 
 1.  **K-Nearest Neighbor (KNN)**
     
@@ -242,6 +289,7 @@ Pada proyek ini, digunakan tiga algoritma machine learning untuk memprediksi har
         -   **Tidak Efisien untuk Dataset Besar**: KNN cenderung lambat pada dataset besar, karena harus memproses seluruh data pada saat prediksi.
         -   **Mudah Terpengaruh oleh Noise**: KNN sangat sensitif terhadap data yang berisik (noise) atau data yang memiliki banyak fitur yang tidak relevan.
         -   **Memerlukan Memori Besar**: Karena KNN menyimpan seluruh data, memori yang dibutuhkan untuk memproses data besar bisa sangat tinggi.
+        -   
 2.  **Random Forest**
     
     -   **Kelebihan**:
@@ -251,6 +299,7 @@ Pada proyek ini, digunakan tiga algoritma machine learning untuk memprediksi har
     -   **Kekurangan**:
         -   **Waktu Latih Lama pada Data Besar**: Proses pelatihan model bisa memakan waktu jika jumlah pohon keputusan yang digunakan sangat banyak.
         -   **Kurang Interpretabel**: Karena merupakan model berbasis ensemble, Random Forest cenderung kurang transparan dalam hal interpretasi hasil model jika dibandingkan dengan model yang lebih sederhana, seperti linear regression.
+          
 3.  **Boosting (AdaBoost)**
     
     -   **Kelebihan**:
@@ -261,38 +310,11 @@ Pada proyek ini, digunakan tiga algoritma machine learning untuk memprediksi har
         -   **Overfitting pada Data yang Sangat Kompleks**: Jika tidak diatur dengan benar, Boosting dapat menyebabkan overfitting, terutama pada dataset yang lebih besar atau lebih rumit.
         -   **Pekerjaan Lambat pada Data Besar**: Proses pelatihan Boosting bisa lebih lambat jika dibandingkan dengan Random Forest, karena fokus pada kesalahan model sebelumnya.
      
-#### Proses Improvement dengan Hyperparameter Tuning
-
-Untuk meningkatkan kinerja model, dilakukan **hyperparameter tuning** pada algoritma **Random Forest**, karena algoritma ini menunjukkan hasil yang menjanjikan dalam evaluasi awal.
-
--   **Hyperparameter Tuning pada Random Forest**:
-    -   **n_estimators**: Jumlah pohon yang digunakan dalam model. Semakin banyak pohon, semakin baik model dalam mengatasi variasi dalam data, tetapi juga semakin lama waktu pelatihan.
-    -   **max_depth**: Menentukan kedalaman maksimum dari pohon keputusan. Pengaturan kedalaman yang tepat bisa mengurangi overfitting dan memastikan model tetap generalis.
-    -   **min_samples_split**: Jumlah minimum sampel yang diperlukan untuk membagi sebuah node. Pengaturan ini mencegah pembagian yang terlalu mendalam yang dapat menyebabkan overfitting.
-    -   **min_samples_leaf**: Jumlah minimum sampel yang diperlukan pada daun pohon keputusan untuk menghindari pembentukan pohon yang sangat dalam dan kompleks.
-
-#### Memilih Model Terbaik
-
-Berdasarkan evaluasi yang dilakukan dengan menggunakan **Mean Squared Error (MSE)** pada data pelatihan dan data uji, model **Random Forest** menunjukkan hasil yang paling baik dengan error yang terkecil. Berikut adalah hasil perbandingan **MSE** dari masing-masing model:
-
-![image](https://github.com/user-attachments/assets/dff611f7-92b7-4cc7-b1f5-3a2c1294d535)
-
-
-**Mengapa Memilih Random Forest sebagai Model Terbaik**:
-
-1.  **Error Terendah**: Random Forest memberikan error yang lebih rendah dibandingkan dengan model lainnya pada data uji.
-2.  **Stabilitas**: Random Forest menunjukkan kinerja yang lebih konsisten, tidak terpengaruh oleh variasi data.
-3.  **Kemampuan untuk Mengatasi Data yang Kompleks**: Dengan teknik ensemble, Random Forest mampu mengatasi hubungan non-linear dan kompleks antara fitur.
-
 ## Model Evaluation
 
-Evaluasi model dilakukan dengan menggunakan metrik Mean Squared Error (MSE) untuk membandingkan hasil prediksi antara model yang berbeda. Berdasarkan hasil pengujian, model Random Forest memberikan error yang paling kecil dibandingkan dengan model KNN dan Boosting. 
-
-Formula MSE adalah sebagai berikut:
+Mean Squared Error (MSE) dipilih sebagai metrik utama evaluasi model karena kemampuannya mengukur rata-rata kesalahan kuadrat antara nilai prediksi dan aktual. Semakin rendah nilai MSE, semakin akurat model dalam memprediksi harga perjalanan taksi. Rumus MSE menghitung selisih kuadrat antara prediksi dan nilai sebenarnya, yang memberikan bobot lebih pada kesalahan prediksi yang signifikan. **Formula MSE** adalah sebagai berikut:
 
 ![image](https://github.com/user-attachments/assets/d873656c-8116-4837-ae5f-c73d8dbb1286)
-
-**Penjelasan Formula**:
 
 -   n adalah jumlah sampel atau data pada dataset.
 -   yi adalah nilai sebenarnya (true value) dari data ke-i (nilai target yang sebenarnya, dalam hal ini harga perjalanan taksi yang sebenarnya).
@@ -308,5 +330,36 @@ MSE digunakan untuk mengukur seberapa baik model prediksi dalam menghasilkan nil
 - MSE yang Besar: Menunjukkan bahwa model menghasilkan prediksi yang jauh dari nilai yang sebenarnya, yang mengindikasikan bahwa model kurang baik dalam menangani data dan menghasilkan estimasi yang akurat.
 
 Misalnya, dalam konteks proyek ini, kita memiliki harga perjalanan taksi yang sebenarnya (𝑦𝑖) dan harga yang diprediksi oleh model (𝑦^𝑖) untuk setiap perjalanan. MSE mengukur sejauh mana prediksi harga perjalanan yang dihasilkan oleh model berbeda dari harga yang sebenarnya.
+
+Berikut adalah hasil perbandingan **MSE** dari masing-masing model pada proyek ini:
+
+![image](https://github.com/user-attachments/assets/dff611f7-92b7-4cc7-b1f5-3a2c1294d535)
+
+Berdasarkan hasil evaluasi, **Random Forest menunjukkan performa paling superior di antara ketiga algoritma yang diuji**. Model ini mampu menghasilkan prediksi dengan error paling minimal, yang berarti memiliki akurasi tertinggi dalam memprediksi harga perjalanan taksi. Rendahnya MSE pada model Random Forest mengindikasikan kemampuan algoritma dalam menangkap pola kompleks dalam dataset, termasuk interaksi antarvariabel yang mempengaruhi penetapan harga.
+
+Dengan demikian, **Kedua problem statement yang diajukan telah berhasil dijawab dengan komprehensif**. Problem statement pertama tentang akurasi prediksi harga perjalanan terjawab melalui pengembangan model Random Forest yang mampu menghasilkan estimasi harga dengan tingkat kesalahan minimal. Problem statement kedua terkait pengurangan ketidakpastian dalam penetapan tarif terpenuhi melalui model yang dapat mempertimbangkan berbagai variabel kompleks seperti jarak, waktu, cuaca, dan kondisi lalu lintas.
+
+**Seluruh goals yang ditetapkan pada awal proyek berhasil dicapai**:
+
+- Pengembangan model prediksi harga dengan akurasi tinggi tercapai melalui Random Forest
+- Sistem prediksi transparan dihasilkan dengan menjelaskan variabel-variabel yang memengaruhi harga
+- Strategi penetapan harga dinamis dapat diimplementasikan berkat model yang mampu mempertimbangkan variabel beragam
+
+**Solusi statement yang direncanakan memberikan dampak signifikan**:
+
+- Implementasi Random Forest terbukti efektif dalam menghasilkan prediksi akurat
+- Preprocessing data komprehensif meningkatkan kualitas model dengan mengurangi noise dan outliers
+- Evaluasi berbasis MSE memberikan metrik objektif untuk mengukur performa model
+
+**Model ini berpotensi mentransformasi pendekatan penetapan harga taksi dari metode statis menjadi dinamis dan data-driven**. Perusahaan taksi dapat menggunakan model untuk:
+
+- Menyesuaikan tarif real-time berdasarkan kondisi spesifik
+- Meningkatkan transparansi penetapan harga
+- Memberikan estimasi biaya yang lebih akurat kepada penumpang
+- Mengoptimalkan strategi pricing untuk meningkatkan pendapatan
+
+Kesimpulannya, proyek ini tidak sekadar menghasilkan model prediksi, melainkan memberikan solusi transformatif dalam pendekatan penetapan harga transportasi berbasis data.
+
+
 
 
